@@ -1,7 +1,7 @@
 {
   "name": "drex",
   "private": true,
-  "workspaces": ["core", "app", "app/src/ui"],
+  "workspaces": ["core"],
   "dependencies": {
     "electrobun": "^1.16.0"
   }

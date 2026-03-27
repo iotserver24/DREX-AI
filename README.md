@@ -6,18 +6,17 @@ This repository is a monorepo containing the core engine, cli, and supporting ap
 
 ## Structure
 
-- **`core/`**: The core autonomous engine (**v1.0.0** — RAG, Grep, Verification).
-- **`app/`**: **DREX Desktop App** (**In Development**) — A high-performance Electrobun + React dashboard.
+- **`core/`**: The core autonomous engine (RAG, Grep, Verification).
 - **`docs/`**: Technical documentation and architecture guides.
-- **`cli/`**: (Coming Soon) The command-line interface for terminal-first workflows.
+- **`cli/`**: (Coming Soon) The command-line interface for local use.
+- **`app/`**: (Coming Soon) The web-based dashboard and orchestrator.
 
 ## Quick Start
 
 To use the core engine in your own project:
 
 ```bash
-# In a Bun workspace
-bun add drex-core@workspace
+bun add ./core
 ```
 
 See `core/README.md` for more details.

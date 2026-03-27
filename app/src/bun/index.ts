@@ -1,183 +1,112 @@
-import electrobun, { BrowserWindow, defineElectrobunRPC } from 'electrobun';
+import { BrowserView, Electrobun } from 'electrobun/main'
 import { Drex } from 'drex-core'
-import { join, dirname } from 'node:path';
-import { relative } from 'path'
-import { readdir, readFile } from 'node:fs/promises';
-import { writeFile } from 'fs/promises'
-import { existsSync } from 'node:fs';
+import { resolve, join, relative } from 'path'
+import { readdir, readFile, writeFile, stat } from 'fs/promises'
 
-// --- RPC Schema ---
-// --- RPC Schema ---
-export type DrexRPCSchema = {
-  bun: {
-    requests: {
-      'run-task': { params: { intent: string; projectPath: string }, response: void };
-      'configure-llm': { params: { apiKey: string; baseURL: string; model: string }, response: { success: boolean; model: string } };
-      'read-file': { params: { path: string }, response: { content: string } };
-      'save-file': { params: { path: string; content: string }, response: { success: boolean } };
-      'get-project-tree': { params: { root: string }, response: { tree: any[] } };
-    };
-    messages: Record<string, never>;
-  };
-  webview: {
-    requests: Record<string, never>;
-    messages: {
-      'plan:ready': { planId: string; tasks: any[] };
-      'task:start': { task: any };
-      'task:done': { task: any; result: any };
-      'review:fail': { task: any; feedback: string; attempt: number };
-      'done': { summary: any };
-      'error': { message: string };
-    };
-  };
+// Initialize DREX Core with user config (will be loaded from settings file)
+let drexInstance: ReturnType<typeof createDrex> | null = null
+
+function createDrex(config: { apiKey: string; baseURL: string; model: string }) {
+  return new Drex({
+    projectRoot: process.cwd(),
+    apiKey: config.apiKey,
+    baseURL: config.baseURL,
+    model: config.model,
+    permissionLevel: 'moderate',
+  })
 }
 
-let drexInstance: Drex | null = null
-
-// Initialize RPC for Bun side
-const rpc: any = defineElectrobunRPC<DrexRPCSchema>('bun', {
-  handlers: {
-    requests: {
-      'run-task': async ({ intent, projectPath: _projectPath }: { intent: string, projectPath: string }) => {
-        if (!drexInstance) throw new Error('DREX not configured')
-        
-        // Forward events to webview via RPC messages
-        drexInstance.on('plan:ready', (plan) => (rpc.send as any)['plan:ready']({ planId: plan.id, tasks: plan.tasks }))
-        drexInstance.on('task:start', (task) => (rpc.send as any)['task:start']({ task }))
-        drexInstance.on('task:done', (task, result) => (rpc.send as any)['task:done']({ task, result }))
-        drexInstance.on('review:fail', (task, feedback, attempt) => (rpc.send as any)['review:fail']({ task, feedback, attempt }))
-        drexInstance.on('done', (summary) => (rpc.send as any)['done']({ summary }))
-        drexInstance.on('error', (err) => (rpc.send as any)['error']({ message: err.message }))
-
-        await drexInstance.run(intent, { headless: true })
-      },
-      'configure-llm': async (config: { apiKey: string, baseURL: string, model: string }) => {
-        drexInstance = new Drex({
-          projectRoot: process.cwd(),
-          ...config,
-          permissionLevel: 'moderate'
-        })
-        return { success: true, model: config.model }
-      },
-      'read-file': async ({ path }: { path: string }) => {
-        const content = await readFile(path, 'utf-8')
-        return { content }
-      },
-      'save-file': async ({ path, content }: { path: string, content: string }) => {
-        await writeFile(path, content, 'utf-8')
-        return { success: true }
-      },
-      'get-project-tree': async ({ root }: { root: string }) => {
-        const tree = await buildFileTree(root)
-        return { tree }
-      }
-    }
-  }
+// Main Electrobun app entry point
+const app = new Electrobun({
+  appName: 'DREX-AI',
 })
 
-// Robust path resolution for both dev and packaged environments
-const possiblePaths = [
-  join(import.meta.dir, '..', 'index.html'), 
-  join(import.meta.dir, '..', 'ui', 'dist', 'index.html'),
-];
-
-let finalPath = '';
-for (const p of possiblePaths) {
-  if (existsSync(p)) {
-    finalPath = p;
-    break;
-  }
-}
-
-const viewsRoot = finalPath ? dirname(finalPath) : join(import.meta.dir, '../ui/dist');
-
-// Pre-build the Electrobun preload script to inject into our HTTP-served index.html
-// This is required on Linux because the native layer doesn't automatically inject the bridge for HTTP URLs
-let preloadScript = '';
-try {
-    const electrobunPkgPath = import.meta.resolve('electrobun/package.json');
-    const electrobunDir = dirname(new URL(electrobunPkgPath).pathname);
-    const preloadPath = join(electrobunDir, 'dist/api/bun/preload/index.ts');
-    
-    console.log(`DEBUG: Bundling preload from: ${preloadPath}`);
-
-    const build = await Bun.build({
-        entrypoints: [preloadPath],
-        target: 'browser',
-    });
-    preloadScript = await build.outputs[0].text();
-    console.log("DEBUG: Electrobun preload script bundled successfully");
-} catch (err) {
-    console.error("DEBUG: Failed to bundle Electrobun preload script", err);
-}
-
-let mainWin: any;
-
-// Start a local static file server to serve the UI
-const uiServer = Bun.serve({
-  port: 0,
-  async fetch(req) {
-    const url = new URL(req.url);
-    let pathName = url.pathname;
-    if (pathName === '/') pathName = '/index.html';
-    
-    const filePath = join(viewsRoot, pathName);
-    const exists = existsSync(filePath);
-    
-    console.log(`DEBUG: UI Server request: ${pathName} - File: ${filePath} - Exists: ${exists}`);
-    
-    if (exists) {
-      if (pathName === '/index.html' && mainWin) {
-          // Inject Electrobun bridge variables and the preload script
-          let content = await readFile(filePath, 'utf-8');
-          const bridgeInjection = `
-          <script>
-            window.__electrobunWebviewId = ${mainWin.webviewId};
-            window.__electrobunRpcSocketPort = ${electrobun.Socket.rpcPort};
-            window.__electrobunSecretKeyBytes = [${mainWin.webview.secretKey.join(',')}];
-            ${preloadScript}
-            console.log("DEBUG: Electrobun bridge injected and initialized");
-          </script>
-          `;
-          content = content.replace('<head>', '<head>' + bridgeInjection);
-          return new Response(content, { headers: { 'Content-Type': 'text/html' } });
-      }
-
-      const file = Bun.file(filePath);
-      const response = new Response(file);
-      
-      // Explicitly set MIME types for Linux WebKitGTK
-      if (pathName.endsWith('.js')) {
-        response.headers.set('Content-Type', 'text/javascript');
-      } else if (pathName.endsWith('.css')) {
-        response.headers.set('Content-Type', 'text/css');
-      } else if (pathName.endsWith('.html')) {
-        response.headers.set('Content-Type', 'text/html');
-      }
-      
-      return response;
-    }
-    
-    return new Response('Not Found', { status: 404 });
-  }
-});
-
-console.log(`DEBUG: UI Server started at ${uiServer.url}`);
-
-mainWin = new BrowserWindow({
-  title: 'DREX-AI',
-  url: `${uiServer.url}index.html`, 
-  viewsRoot: null,
-  frame: {
+app.on('ready', () => {
+  const mainView = new BrowserView({
+    url: resolve(import.meta.dir, '../ui/dist/index.html'),
     width: 1400,
     height: 900,
-    x: 100,
-    y: 100
-  },
-  rpc
-})
+    title: 'DREX-AI',
+    minWidth: 1024,
+    minHeight: 700,
+  })
 
-void mainWin;
+  mainView.show()
+
+  // Handle messages from UI via Electrobun RPC
+  mainView.on('run-task', async (payload: { intent: string; projectPath: string }) => {
+    try {
+      if (!drexInstance) {
+        mainView.send('error', { message: 'LLM not configured. Please go to Settings.' })
+        return
+      }
+
+      const drex = drexInstance
+
+      drex.on('plan:ready', (plan) => {
+        mainView.send('plan:ready', { planId: plan.id, tasks: plan.tasks })
+      })
+
+      drex.on('task:start', (task) => {
+        mainView.send('task:start', { task })
+      })
+
+      drex.on('task:done', (task, result) => {
+        mainView.send('task:done', { task, result })
+      })
+
+      drex.on('review:fail', (task, feedback, attempt) => {
+        mainView.send('review:fail', { task, feedback, attempt })
+      })
+
+      drex.on('done', (summary) => {
+        mainView.send('done', { summary })
+      })
+
+      drex.on('error', (err) => {
+        mainView.send('error', { message: err.message })
+      })
+
+      await drex.run(payload.intent, { headless: true })
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err)
+      mainView.send('error', { message })
+    }
+  })
+
+  mainView.on('configure-llm', (config: { apiKey: string; baseURL: string; model: string }) => {
+    drexInstance = createDrex(config)
+    mainView.send('llm-configured', { success: true, model: config.model })
+  })
+
+  // File System RPCs
+  mainView.on('read-file', async (payload: { path: string }) => {
+    try {
+      const content = await readFile(payload.path, 'utf-8')
+      mainView.send('file-content', { path: payload.path, content })
+    } catch (err) {
+      mainView.send('error', { message: `Failed to read file: ${payload.path}` })
+    }
+  })
+
+  mainView.on('save-file', async (payload: { path: string; content: string }) => {
+    try {
+      await writeFile(payload.path, payload.content, 'utf-8')
+      mainView.send('file-saved', { path: payload.path })
+    } catch (err) {
+      mainView.send('error', { message: `Failed to save file: ${payload.path}` })
+    }
+  })
+
+  mainView.on('get-project-tree', async (payload: { root: string }) => {
+    try {
+      const tree = await buildFileTree(payload.root)
+      mainView.send('project-tree', { tree })
+    } catch (err) {
+      mainView.send('error', { message: 'Failed to build project tree' })
+    }
+  })
+})
 
 async function buildFileTree(dir: string, baseDir: string = dir): Promise<any[]> {
   const entries = await readdir(dir, { withFileTypes: true })
@@ -185,8 +114,10 @@ async function buildFileTree(dir: string, baseDir: string = dir): Promise<any[]>
 
   for (const entry of entries) {
     if (entry.name === 'node_modules' || entry.name === '.git' || entry.name === 'dist') continue
+
     const fullPath = join(dir, entry.name)
     const relPath = relative(baseDir, fullPath)
+
     if (entry.isDirectory()) {
       result.push({
         name: entry.name,
@@ -210,3 +141,5 @@ async function buildFileTree(dir: string, baseDir: string = dir): Promise<any[]>
     return a.type === 'directory' ? -1 : 1
   })
 }
+
+app.run()
