@@ -1,0 +1,149 @@
+/* DREX-AI Global Styles — "Kinetic Ether" Design System */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --surface: #0D0D1A;
+  --surface-low: #121220;
+  --surface-container: #181828;
+  --surface-high: #1E1E2F;
+  --surface-highest: #242437;
+  --outline-variant: #474656;
+  --primary: #A855F7;
+  --primary-light: #CC97FF;
+  --on-primary: #47007C;
+  --on-surface: #E9E6F9;
+  --on-surface-muted: #ABA9BB;
+  --error: #FF6E84;
+  --success: #4ADE80;
+  --warning: #F59E0B;
+  --info: #60A5FA;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+}
+
+html, body, #root {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--surface);
+  color: var(--on-surface);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--outline-variant); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: var(--primary); }
+
+/* Utility */
+.mono { font-family: var(--font-mono); }
+.muted { color: var(--on-surface-muted); }
+.text-primary { color: var(--primary-light); }
+.text-success { color: var(--success); }
+.text-error { color: var(--error); }
+.text-warning { color: var(--warning); }
+.text-info { color: var(--info); }
+
+/* Glass panel */
+.glass {
+  background: rgba(36, 36, 55, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-top: 1px solid rgba(71, 70, 86, 0.3);
+}
+
+/* Badge */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.badge-running { background: rgba(168, 85, 247, 0.15); color: var(--primary-light); }
+.badge-done    { background: rgba(74, 222, 128, 0.12); color: var(--success); }
+.badge-failed  { background: rgba(255, 110, 132, 0.12); color: var(--error); }
+.badge-pending { background: rgba(71, 70, 86, 0.4); color: var(--on-surface-muted); }
+
+/* Button */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: none;
+  outline: none;
+}
+.btn-primary { background: var(--primary); color: var(--on-primary); }
+.btn-primary:hover { background: var(--primary-light); box-shadow: 0 0 16px rgba(168, 85, 247, 0.3); }
+.btn-ghost { background: transparent; color: var(--on-surface-muted); border: 1px solid rgba(71, 70, 86, 0.5); }
+.btn-ghost:hover { border-color: var(--outline-variant); color: var(--on-surface); }
+
+/* Input */
+.input {
+  background: var(--surface-low);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--on-surface);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  padding: 8px 12px;
+  width: 100%;
+  transition: border-color 0.15s;
+  caret-color: var(--primary);
+}
+.input:focus { outline: none; border-color: rgba(168, 85, 247, 0.5); }
+.input::placeholder { color: var(--on-surface-muted); }
+
+/* Sidebar Nav */
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--on-surface-muted);
+  transition: all 0.1s;
+}
+.nav-item:hover { background: var(--surface-high); color: var(--on-surface); }
+.nav-item.active { background: rgba(168, 85, 247, 0.15); color: var(--primary-light); }
+
+/* Progress bar */
+.progress-track {
+  height: 3px;
+  background: var(--surface-highest);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary), var(--primary-light));
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}

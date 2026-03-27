@@ -1,0 +1,24 @@
+{
+  "name": "drex-app",
+  "version": "0.1.0",
+  "description": "DREX-AI Desktop App — Cross-platform autonomous coding agent UI (Win/Mac/Linux)",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun run build:ui && electrobun dev",
+    "build": "bun run build:ui && electrobun build",
+    "build:ui": "cd src/ui && bun run build",
+    "package": "electrobun package"
+  },
+  "electrobun": {
+    "main": "src/main/index.ts",
+    "icon": "build/icon.png",
+    "appName": "DREX-AI",
+    "appId": "ai.drex.desktop",
+    "productName": "DREX-AI"
+  },
+  "dependencies": {
+    "drex-core": "workspace:../core",
+    "electrobun": "latest"
+  }
+}
