@@ -56,7 +56,7 @@ export default function Settings() {
                 { label: 'Model Name', value: model, setValue: setModel, placeholder: 'gpt-4o / GLM-5 / deepseek-coder', mono: true },
               ].map(f => (
                 <div key={f.label}>
-                  <label style={{ fontSize: 12, color: 'var(--on-surface-muted)', marginBottom: 6, display: 'block', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: 10.5 }}>{f.label}</label>
+                  <label style={{ color: 'var(--on-surface-muted)', marginBottom: 6, display: 'block', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: 12 }}>{f.label}</label>
                   <input
                     className="input"
                     value={f.value}

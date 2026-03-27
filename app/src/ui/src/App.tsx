@@ -1,87 +1,71 @@
 import { useState } from 'react'
-import Dashboard from './components/Dashboard.tsx'
-import TaskDetail from './components/TaskDetail.tsx'
-import Settings from './components/Settings.tsx'
+import React, { useState, useEffect } from 'react';
+import { Sidebar } from './components/Sidebar';
+import { Editor } from './components/Editor';
+import { AIChat } from './components/AIChat';
+import { Cpu, Wifi, GitBranch } from 'lucide-react';
+import { rpc } from './rpc';
 
-type Screen = 'dashboard' | 'taskDetail' | 'settings'
-type NavItem = { id: Screen; label: string; icon: string }
+const App: React.FC = () => {
+  const [activeFile, setActiveFile] = useState<string | null>(null);
+  const [isAgentRunning, setIsAgentRunning] = useState(false);
 
-const NAV: NavItem[] = [
-  { id: 'dashboard', label: 'Dashboard', icon: '⬡' },
-  { id: 'taskDetail', label: 'Tasks', icon: '⚡' },
-  { id: 'settings', label: 'Settings', icon: '⚙' },
-]
+  useEffect(() => {
+    const onStart = () => setIsAgentRunning(true);
+    const onDone = () => setIsAgentRunning(false);
+    const onError = (payload: { message: string }) => {
+      console.error('DREX Error:', payload.message);
+      setIsAgentRunning(false);
+    };
 
-export default function App() {
-  const [screen, setScreen] = useState<Screen>('dashboard')
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
+    rpc.addMessageListener('task:start', onStart);
+    rpc.addMessageListener('done', onDone);
+    rpc.addMessageListener('error', onError);
 
-  const navigate = (s: Screen, taskId?: string) => {
-    if (taskId) setSelectedTaskId(taskId)
-    setScreen(s)
-  }
+    return () => {
+      rpc.removeMessageListener('task:start', onStart);
+      rpc.removeMessageListener('done', onDone);
+      rpc.removeMessageListener('error', onError);
+    };
+  }, []);
 
   return (
-    <div style={{ display: 'flex', height: '100vh', background: 'var(--surface)', overflow: 'hidden' }}>
-      {/* Sidebar */}
-      <aside style={{
-        width: 220,
-        background: 'var(--surface-low)',
-        display: 'flex',
-        flexDirection: 'column',
-        padding: '16px 8px',
-        flexShrink: 0,
-      }}>
-        {/* Logo */}
-        <div style={{ padding: '8px 14px 20px', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{
-            width: 30, height: 30,
-            background: 'linear-gradient(135deg, var(--primary), #7C3AED)',
-            borderRadius: 6,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 14, fontWeight: 700, color: '#fff', letterSpacing: '-0.5px',
-          }}>D</div>
-          <span style={{ fontWeight: 700, fontSize: 16, letterSpacing: '-0.5px', color: 'var(--on-surface)' }}>DREX</span>
-          <span style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--on-surface-muted)', fontFamily: 'var(--font-mono)' }}>v1.0</span>
-        </div>
+    <div className="app-container">
+      {/* Main Layout Area */}
+      <div className="main-layout">
+        <Sidebar onSelectFile={(path) => setActiveFile(path)} />
+        
+        <main className="center-pane">
+          <Editor activeFile={activeFile} isThinking={isAgentRunning} />
+        </main>
 
-        {/* Nav */}
-        <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {NAV.map(item => (
-            <button
-              key={item.id}
-              className={`nav-item ${screen === item.id || (screen === 'taskDetail' && item.id === 'taskDetail') ? 'active' : ''}`}
-              onClick={() => navigate(item.id)}
-              style={{ width: '100%', textAlign: 'left', background: 'none', border: 'none', fontFamily: 'var(--font-sans)' }}
-            >
-              <span style={{ fontSize: 15 }}>{item.icon}</span>
-              {item.label}
-            </button>
-          ))}
-        </nav>
+        <AIChat />
+      </div>
 
-        {/* Bottom user avatar */}
-        <div style={{ padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 10, borderTop: '1px solid rgba(71,70,86,0.2)', paddingTop: 14 }}>
-          <div style={{
-            width: 28, height: 28,
-            background: 'var(--primary)',
-            borderRadius: '50%',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 12, fontWeight: 600, color: 'var(--on-primary)',
-          }}>A</div>
-          <div style={{ fontSize: 12 }}>
-            <div style={{ color: 'var(--on-surface)', fontWeight: 500 }}>Developer</div>
-            <div style={{ color: 'var(--on-surface-muted)' }}>Pro</div>
+      {/* Bottom Status Bar */}
+      <footer className="status-bar">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <GitBranch size={12} />
+            <span>main</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Wifi size={12} />
+            <span>GLM-5 Connected</span>
           </div>
         </div>
-      </aside>
-
-      {/* Main content */}
-      <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        {screen === 'dashboard' && <Dashboard onSelectTask={(id) => navigate('taskDetail', id)} />}
-        {screen === 'taskDetail' && <TaskDetail taskId={selectedTaskId} onBack={() => navigate('dashboard')} />}
-        {screen === 'settings' && <Settings />}
-      </main>
+        
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Cpu size={12} />
+            <span>TASKS (2)</span>
+          </div>
+          <span>L:42, C:18</span>
+          <span>UTF-8</span>
+        </div>
+      </footer>
     </div>
-  )
-}
+  );
+};
+
+export default App;
