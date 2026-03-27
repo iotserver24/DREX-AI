@@ -1,0 +1,34 @@
+{
+  "name": "drex-core",
+  "version": "1.0.0",
+  "description": "Autonomous multi-agent AI coding engine with RAG+Grep and execution verification.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "rm -rf dist && bunx tsc",
+    "test": "bun test",
+    "prepublishOnly": "bun run build && bun run test"
+  },
+  "peerDependencies": {
+    "bun": ">=1.0.0"
+  },
+  "dependencies": {
+    "p-limit": "latest"
+  },
+  "devDependencies": {
+    "bun-types": "^1.3.11",
+    "typescript": "^6.0.2"
+  }
+}
