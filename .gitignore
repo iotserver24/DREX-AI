@@ -7,6 +7,7 @@ bun.lock
 dist/
 build/
 .output/
+.next/
 
 # Logs
 logs/
@@ -33,3 +34,8 @@ core/temp_smoke_test*/
 core/dist/
 .drex/
 core_docs_prompt.txt
+
+# App specific
+app/.next/
+app/dist/
+app/.turbo/

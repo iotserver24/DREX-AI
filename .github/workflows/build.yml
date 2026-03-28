@@ -1,0 +1,183 @@
+name: Build and Test
+
+on:
+  push:
+    branches: [main, claude/**]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-core:
+    name: Build drex-core
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install core dependencies
+        working-directory: ./core
+        run: bun install
+
+      - name: Build core
+        working-directory: ./core
+        run: bun run build
+
+      - name: Test core
+        working-directory: ./core
+        run: bun run test
+
+      - name: Upload core dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: core-dist
+          path: core/dist/
+
+  build-app:
+    name: Build DREX App
+    runs-on: ubuntu-latest
+    needs: build-core
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Download core dist
+        uses: actions/download-artifact@v4
+        with:
+          name: core-dist
+          path: core/dist/
+
+      - name: Install workspace dependencies
+        run: bun install
+
+      - name: Install app dependencies
+        working-directory: ./app
+        run: bun install
+
+      - name: Build Next.js renderer
+        working-directory: ./app
+        run: bun run build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-build
+          path: |
+            app/.next/
+            app/dist/
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Check TypeScript (core)
+        working-directory: ./core
+        run: bunx tsc --noEmit
+
+      - name: Check TypeScript (app)
+        working-directory: ./app
+        run: bunx tsc --noEmit
+
+  screenshots:
+    name: Generate Screenshots
+    runs-on: ubuntu-latest
+    needs: build-app
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Playwright
+        run: bunx playwright install --with-deps chromium
+
+      - name: Download core dist
+        uses: actions/download-artifact@v4
+        with:
+          name: core-dist
+          path: core/dist/
+
+      - name: Download app build
+        uses: actions/download-artifact@v4
+        with:
+          name: app-build
+          path: app/.next/
+
+      - name: Install workspace dependencies
+        run: bun install
+
+      - name: Install app dependencies
+        working-directory: ./app
+        run: bun install
+
+      - name: Start Next.js dev server
+        working-directory: ./app/renderer
+        run: |
+          bunx next dev &
+          sleep 10
+
+      - name: Take screenshots
+        run: |
+          mkdir -p screenshots
+          bunx playwright screenshot --browser=chromium --viewport-size=1280,800 \
+            http://localhost:3000/projects screenshots/projects.png
+          bunx playwright screenshot --browser=chromium --viewport-size=1280,800 \
+            http://localhost:3000/run screenshots/run.png
+          bunx playwright screenshot --browser=chromium --viewport-size=1280,800 \
+            http://localhost:3000/settings screenshots/settings.png
+
+      - name: Upload screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: screenshots/
+
+  all-checks:
+    name: All Checks Passed
+    runs-on: ubuntu-latest
+    needs: [build-core, build-app, lint]
+    if: always()
+
+    steps:
+      - name: Check build status
+        run: |
+          if [ "${{ needs.build-core.result }}" != "success" ] || \
+             [ "${{ needs.build-app.result }}" != "success" ] || \
+             [ "${{ needs.lint.result }}" != "success" ]; then
+            echo "Some checks failed"
+            exit 1
+          fi
+          echo "All checks passed!"
