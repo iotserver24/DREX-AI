@@ -1,8 +1,15 @@
 {
   "name": "drex",
   "private": true,
-  "workspaces": ["core"],
+  "workspaces": ["core", "app"],
   "dependencies": {
     "electrobun": "^1.16.0"
+  },
+  "scripts": {
+    "build": "bun run build:core && bun run build:app",
+    "build:core": "cd core && bun run build",
+    "build:app": "cd app && bun run build",
+    "test": "cd core && bun test",
+    "dev": "cd app && bun run dev"
   }
 }
